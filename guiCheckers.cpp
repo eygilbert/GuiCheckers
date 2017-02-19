@@ -148,7 +148,7 @@ struct SDatabaseInfo
 };
 
 SDatabaseInfo g_dbInfo;
-char db_path[260] = "database";
+char db_path[260] = "db_dtw";
 int enable_wld = 1;
 
 //------------------------
@@ -225,50 +225,41 @@ void RunningDisplay(int bestMove, int bSearching)
 
 	// Also announce distance to win when the databases are returning high scores
 	#ifdef USE_ED_TRICE_CODE
-		if(g_SearchingMove == 0)
-		{
-			if (abs(2000 - abs(LastEval)) <= game_over_distance)
-			{
-				if (LastEval < 0)
-				{
-					if (g_CBoard.SideToMove == BLACK) j += sprintf(sTemp + j, "#### Red wins in %d ####", abs(2000 - abs(LastEval)));
-					else j += sprintf(sTemp + j, "#### White loses in %d ####", abs(2000 - abs(LastEval)));
-				}
-				else
-				{
-					if (g_CBoard.SideToMove == BLACK) j += sprintf(sTemp + j, "#### Red loses in %d ####", abs(2000 - abs(LastEval)));
-					else j += sprintf(sTemp + j, "#### White wins in %d ####", abs(2000 - LastEval));
-				}
-			}
-			else
-				j += sprintf(sTemp + j, "Depth: %d/%d (%d/%d)   Eval: %d  ", SearchDepth, g_SelectiveDepth, g_SearchingMove, g_Movelist[1].numMoves, -LastEval);
+	if (abs(2000 - abs(LastEval)) <= game_over_distance) {
+		char *prefix, *suffix;
+
+		if (bCheckerBoard) {
+			prefix = "";
+			suffix = "   ";
 		}
-		else
-		{
-			if (abs(2000 - abs(LastEval)) <= game_over_distance)
-			{
-				if (LastEval < 0)
-				{
-					if (g_CBoard.SideToMove == BLACK) j += sprintf(sTemp + j, "#### Red wins in %d ####", abs(2000 - abs(LastEval)));
-					else j += sprintf(sTemp + j, "#### White loses in %d ####", abs(2000 - abs(LastEval)));
-				}
-				else
-				{
-					if (g_CBoard.SideToMove == BLACK) j += sprintf(sTemp + j, "#### Red loses in %d ####", abs(2000 - abs(LastEval)));
-					else j += sprintf(sTemp + j, "#### White wins in %d ####", abs(2000 - abs(LastEval)));
-				}
-			}
-			else
-				j += sprintf(sTemp + j, "Depth: %d/%d (%d/%d)   Eval: %d  ", SearchDepth, g_SelectiveDepth, g_SearchingMove, g_Movelist[1].numMoves, -LastEval);
+		else {
+			prefix = "#### ";
+			suffix = " ####";
 		}
-	#else
+		if (LastEval < 0) {
+			if (g_CBoard.SideToMove == BLACK)
+				j += sprintf(sTemp + j, "%sRed wins in %d%s", prefix, abs(2000 - abs(LastEval)), suffix);
+			else
+				j += sprintf(sTemp + j, "%sWhite loses in %d%s", prefix, abs(2000 - abs(LastEval)), suffix);
+		}
+		else {
+			if (g_CBoard.SideToMove == BLACK)
+				j += sprintf(sTemp + j, "%sRed loses in %d%s", prefix, abs(2000 - abs(LastEval)), suffix);
+			else
+				j += sprintf(sTemp + j, "%sWhite wins in %d%s", prefix, abs(2000 - LastEval), suffix);
+		}
+	}
+	else
 		j += sprintf(sTemp + j, "Depth: %d/%d (%d/%d)   Eval: %d  ", SearchDepth, g_SelectiveDepth, g_SearchingMove, g_Movelist[1].numMoves, -LastEval);
 	#endif
 
 
-	if ( !bCheckerBoard ) j+=sprintf( sTemp+j, "\n" );
-	j+=sprintf (sTemp+j, "Move: %d%c%d   Time: %.2fs   Nodes: %s (db: %s)   KN/Sec: %d   ", FlipX(bestMove&63)+1, cCap, FlipX((bestMove>>6)&63)+1, seconds, GetNodeCount(nodes,0), GetNodeCount(databaseNodes,1), nps);
-	DisplayText (sTemp);
+	if (!bCheckerBoard )
+		j+=sprintf(sTemp+j, "\n");
+
+	j += sprintf (sTemp+j, "Move: %d%c%d   Time: %.2fs   Speed %d KN/s   Nodes: %s (db: %s)   ", 
+				FlipX(bestMove&63)+1, cCap, FlipX((bestMove>>6)&63)+1, seconds, nps, GetNodeCount(nodes,0), GetNodeCount(databaseNodes,1));
+	DisplayText(sTemp);
 }
 
 // ---------------------------------------------
@@ -1448,8 +1439,13 @@ int WINAPI enginecommand(char str[256], char reply[1024])
 			return 1;
 		}
 		if (strcmp(param1, "dbpath") == 0) {
-			if (strcmp(param2, db_path)) {
-				strcpy(db_path, param2);
+			char *p = strstr(str, "dbpath");	/* Cannot use param2 here because it does not allow spaces in the path. */
+			while (!isspace(*p))				/* Skip 'dbpath' and following space. */
+				++p;
+			while (isspace(*p))
+				++p;
+			if (strcmp(p, db_path)) {
+				strcpy(db_path, p);
 				save_dbpath(db_path);
 			}
 			sprintf(reply, "dbpath set to %s", db_path);
