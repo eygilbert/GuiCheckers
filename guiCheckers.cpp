@@ -237,16 +237,16 @@ void RunningDisplay(int bestMove, int bSearching)
 			suffix = " ####";
 		}
 		if (LastEval < 0) {
-			if (g_CBoard.SideToMove == BLACK)
-				j += sprintf(sTemp + j, "%sRed wins in %d%s", prefix, abs(2000 - abs(LastEval)), suffix);
+			if (g_CBoard.SideToMove == WHITE)
+				j += sprintf(sTemp + j, "%sRed wins in %d%s", prefix, abs(2001 - abs(LastEval)), suffix);
 			else
-				j += sprintf(sTemp + j, "%sWhite loses in %d%s", prefix, abs(2000 - abs(LastEval)), suffix);
+				j += sprintf(sTemp + j, "%sWhite loses in %d%s", prefix, abs(2001 - abs(LastEval)), suffix);
 		}
 		else {
-			if (g_CBoard.SideToMove == BLACK)
-				j += sprintf(sTemp + j, "%sRed loses in %d%s", prefix, abs(2000 - abs(LastEval)), suffix);
+			if (g_CBoard.SideToMove == WHITE)
+				j += sprintf(sTemp + j, "%sRed loses in %d%s", prefix, abs(2001 - abs(LastEval)), suffix);
 			else
-				j += sprintf(sTemp + j, "%sWhite wins in %d%s", prefix, abs(2000 - LastEval), suffix);
+				j += sprintf(sTemp + j, "%sWhite wins in %d%s", prefix, abs(2001 - LastEval), suffix);
 		}
 	}
 	else
