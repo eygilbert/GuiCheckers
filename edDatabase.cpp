@@ -3517,7 +3517,7 @@ int QueryEdsDatabase( const CBoard &Board, int ahead )
 	/*                                                                                            */
 	/*                   2001 - distance_to_win_or_lose_or_possibly_draw - ahead                  */
 	/*                                                                                            */
-	/*    if you maximum good scores for white.                                                   */
+	/*    if you maximize good scores for white.                                                  */
 	/*                                                                                            */
 	/* 3. if(distance_to_win_or_lose_or_possibly_draw % 2 == 0) then you have a white loss, since */
 	/*    it is an even number. return the value:                                                 */
