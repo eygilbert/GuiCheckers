@@ -1,4 +1,5 @@
 #pragma once
+#include <Windows.h>
 #include <stdint.h>
 
 /* Definitions shared between CheckerBoard and an engine.
@@ -6,7 +7,7 @@
  * to CheckerBoard or a compatible engine.
  */
 
-/* Piece types on board[8][8], used by getmove(), islegal(). */
+/* Piece types on Board8x8, used by getmove(), islegal(). */
 #define CB_WHITE 1
 #define CB_BLACK 2
 #define CB_MAN 4
@@ -61,19 +62,21 @@ struct CBmove {
 	int jumps;				/* number of pieces jumped. */
 	int newpiece;			/* piece type that lands on the 'to' square. */
 	int oldpiece;			/* piece type that disappears from the 'from' square. */
-	coor from;		/* coordinates of the from piece in 8x8 notation. */
-	coor to;			/* coordinates of the to piece in 8x8 notation. */
-	coor path[12];	/* intermediate path coordinates of the moving pieces. */
+	coor from;				/* coordinates of the from piece in 8x8 notation. */
+	coor to;				/* coordinates of the to piece in 8x8 notation. */
+	coor path[12];			/* intermediate path coordinates of the moving pieces. */
 							/* Starts at path[1]; path[0] is not used. */
-	coor del[12];	/* squares of pieces that are captured. */
+	coor del[12];			/* squares of pieces that are captured. */
 	int delpiece[12];		/* piece type of pieces that are captured. */
 };
 
+typedef int Board8x8[8][8];
+
 /* Function pointer types of engine interface functions. */
-typedef INT (WINAPI *CB_GETMOVE)(int board[8][8], int color, double maxtime, char str[1024], int *playnow, int info, int unused, CBmove *move);
+typedef INT (WINAPI *CB_GETMOVE)(Board8x8 board, int color, double maxtime, char str[1024], int *playnow, int info, int unused, CBmove *move);
 typedef INT (WINAPI *CB_GETSTRING)(char str[255]);		/* engine name, engine help */
 typedef unsigned int (WINAPI *CB_GETGAMETYPE)(void);	/* return GT_ENGLISH, GT_ITALIAN, ... */
-typedef INT (WINAPI *CB_ISLEGAL)(int board[8][8], int color, int from, int to, CBmove *move);
+typedef INT (WINAPI *CB_ISLEGAL)(Board8x8 board, int color, int from, int to, CBmove *move);
 typedef INT (WINAPI *CB_ENGINECOMMAND)(char command[256], char reply[ENGINECOMMAND_REPLY_SIZE]);
 
 
@@ -96,4 +99,88 @@ inline bool get_incremental_times(int info, int moreinfo, double *increment, dou
 	return(true);
 }
 
+/* 
+ * Given a square number (1..32), return the x,y coordinates for a Board8x8.
+ */
+inline void numbertocoors(int number, int *x, int *y, int gametype)
+{
+	switch (gametype) {
+	case GT_ITALIAN:
+		number--;						// number e 0...31
+		*y = number / 4;				// *y e 0...7
+		*x = 2 * ((number % 4));		// *x e {0,2,4,6}
+		if (((*y) % 2))					// adjust x on odd rows
+			(*x)++;
+		break;
+
+	case GT_SPANISH:
+		number--;
+		*y = number / 4;
+		*y = 7 - *y;
+		*x = 2 * (3 - (number % 4));	// *x e {0,2,4,6}
+		if (((*y) % 2))					// adjust x on odd rows
+			(*x)++;
+		break;
+
+	case GT_CZECH:						// TODO: check that this is correct!
+		number--;						// number e 0...31
+		number = 33 - number;
+		*y = number / 4;				// *y e 0...7
+		*x = 2 * ((number % 4));		// *x e {0,2,4,6}
+		if (((*y) % 2))					// adjust x on odd rows
+			(*x)++;
+		break;
+
+	default:
+		number--;
+		*y = number / 4;
+		*x = 2 * (3 - number % 4);
+		if ((*y) % 2)
+			(*x)++;
+	}
+}
+
+inline void numbertocoors(int number, coor *c, int gametype)
+{
+	numbertocoors(number, &c->x, &c->y, gametype);
+}
+
+/*
+ * Give the x,y coordinates for a Board8x8, return the square number (1..32).
+ */
+inline int coorstonumber(int x, int y, int gametype)
+{
+	int number;
+
+	switch (gametype) {
+	case GT_ITALIAN:
+		// italian rules
+		number = 1;
+		number += 4 * y;
+		number += x / 2;
+		break;
+
+	case GT_SPANISH:
+		// spanish rules
+		number = 1;
+		number += 4 * (7 - y);
+		number += (7 - x) / 2;
+		break;
+
+	case GT_CZECH:
+		// TODO: make sure this is correct for czech rules
+		number = 1;
+		number += 4 * y;
+		number += x / 2;
+		number = 33 - number;
+		break;
+
+	default:
+		number = 0;
+		number += 4 * (y + 1);
+		number -= x / 2;
+	}
+
+	return number;
+}
 

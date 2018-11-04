@@ -1523,9 +1523,9 @@ int WINAPI getmove
 	else
 		nDraw = 0;
 	if (nDraw >= 8)
-		retVal = 0;
+		retVal = CB_DRAW;
 	if (g_CBoard.InDatabase(g_dbInfo) && abs(Eval) < 2)
-		retVal = 0;
+		retVal = CB_DRAW;
 
 	g_numMoves++;								// Increment again since the next board coming in will be after the opponent has played his move
 	return retVal;
