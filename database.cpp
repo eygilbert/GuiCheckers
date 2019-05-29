@@ -4,6 +4,9 @@
 //
 // note: This is rather poor database code in most ways...
 //
+#include "board.h"
+#include "database.h"
+#include "guiCheckers.h"
 #include "uncompress.cpp"
 
 const int SIZE2 = 32 / 4 * 32 * 2;
@@ -13,10 +16,6 @@ unsigned char ResultsTwo[4 * SIZE2];
 unsigned char ResultsThree[6 * SIZE3];
 unsigned char *ResultsFour;
 unsigned char *pResults;
-
-const int DRAW = 0;
-const int BLACKWIN = 1;
-const int WHITEWIN = 2;
 
 int PC2[4 * 4] =
 {

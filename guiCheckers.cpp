@@ -15,10 +15,15 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-#include <conio.h>
 #include <memory.h>
 #include <windows.h>
 #include <assert.h>
+#include "ai.h"
+#include "edDatabase.h"
+#include "guiCheckers.h"
+#include "board.h"
+#include "database.h"
+#include "obook.h"
 #include "resource.h"
 #include "cb_interface.h"
 #include "logfile.h"
@@ -50,12 +55,9 @@ const int BEGINNER_DEPTH = 2;
 const int NORMAL_DEPTH = 8;
 const int EXPERT_DEPTH = 52;
 
-const int KING_VAL = 33;
 const int INVALID_VALUE = -100000;
 
 const int OFF = 0;
-
-enum eMoveResult { INVALID_MOVE = 0, VALID_MOVE = 1, DOUBLEJUMP = 2000 };
 
 // GLOBAL VARIABLES... ugg, too many?
 #ifdef USE_ED_TRICE_CODE
@@ -70,7 +72,6 @@ char *g_sNameVer = "Gui Checkers 1.10";
 char *g_sInfo = NULL;
 float fMaxSeconds = 2.0f;				// The number of seconds the computer is allowed to search
 double new_iter_maxtime;				// Threshold for starting another iteration of iterative deepening
-float g_fPanic;
 int g_bEndHard = FALSE;					// Set to true to stop search after fMaxSeconds no matter what.
 int g_MaxDepth = EXPERT_DEPTH;
 int use_opendb = 1;
@@ -117,21 +118,6 @@ HWND BottomWnd = NULL;
 int g_nSelSquare = NONE;
 char g_buffer[32768];					// For PDN copying/pasting/loading/saving
 
-// Endgame Database
-enum dbType_e { DB_WIN_LOSS_DRAW, DB_EXACT_VALUES };
-
-struct SDatabaseInfo
-{
-	SDatabaseInfo() {
-		loaded = false;
-	}
-	int numPieces;
-	int numWhite;
-	int numBlack;
-	dbType_e type;
-	bool loaded;
-};
-
 SDatabaseInfo g_dbInfo;
 char db_path[260] = "db_dtw";
 int enable_wld = 1;
@@ -142,16 +128,8 @@ int enable_wld = 1;
 int QueryEdsDatabase(const CBoard &Board, int ahead);
 int QueryGuiDatabase(const CBoard &Board);
 
-#include "movegen.cpp"
-#include "board.cpp"
-#include "obook.cpp"
-
 COpeningBook *pBook = NULL;
 
-#include "ai.cpp"
-
-#include "database.cpp"
-#include "edDatabase.cpp"
 
 // -----------------------
 // Display search information

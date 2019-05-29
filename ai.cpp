@@ -1,3 +1,11 @@
+#include "guiCheckers.h"
+#include "board.h"
+#include "obook.h"
+
+float g_fPanic;
+CBoard g_Boardlist[MAX_SEARCHDEPTH + 1];
+
+
 // ===============================================
 //					 SEARCH
 // ===============================================
@@ -351,6 +359,7 @@ int ComputerMove(char cColor, CBoard &InBoard)
 	int LastEval = 0, Eval, nps = 0, nDoMove = NONE, bestmove = NONE;
 	CBoard TempBoard;
 	g_ucAge++;					// TT
+	extern COpeningBook* pBook;
 
 	// return if game is over
 	if (InBoard.C.BP == 0 || InBoard.C.WP == 0)

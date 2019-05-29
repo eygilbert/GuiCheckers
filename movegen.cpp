@@ -1,3 +1,5 @@
+#include "movegen.h"
+
 // =================================================
 
 //
@@ -7,31 +9,7 @@
 //
 
 // =================================================
-struct SMove
-{
-	unsigned short SrcDst;
-	char cPath[10];
-};
 
-// This is now the only board structure used for GUI checkers. It is 16 bytes in size.
-struct SCheckerBoard
-{
-	// data
-	UINT WP;		// White Pieces
-	UINT BP;		// Black Pieces
-	UINT K;			// Kings (of either color)
-	UINT empty;		// Empty squares
-
-	// functions
-	int inline GetBlackMoves();
-	int inline GetWhiteMoves();
-	int inline CanWhiteCheckerMove(UINT checkers);
-	int inline CanBlackCheckerMove(UINT checkers);
-	UINT inline GetJumpersWhite();
-	UINT inline GetJumpersBlack();
-	UINT inline GetMoversWhite();
-	UINT inline GetMoversBlack();
-};
 
 //
 // BITBOARD INITIALIZATION
@@ -222,10 +200,6 @@ const UINT S[34] =
 // They define squares for which a particular shift is possible.
 // eg. L3 = Left 3 = squares where you can move from src to src+3
 
-/*#define MASK_L3 235802126
-#define MASK_L5 7368816
-#define MASK_R3 1886417008 
-#define MASK_R5 235802112 */
 const UINT MASK_L3 = S[1] | S[2] | S[3] | S[9] | S[10] | S[11] | S[17] | S[18] | S[19] | S[25] | S[26] | S[27];
 const UINT MASK_L5 = S[4] | S[5] | S[6] | S[12] | S[13] | S[14] | S[20] | S[21] | S[22];
 const UINT MASK_R3 = S[28] | S[29] | S[30] | S[20] | S[21] | S[22] | S[12] | S[13] | S[14] | S[4] | S[5] | S[6];
@@ -284,14 +258,6 @@ void InitBitTables()
 		aHighBit[Moves] = nHigh;
 		aBitCount[Moves] = nBits;
 	}
-}
-
-// Return the number of 1 bits in a 32-bit int
-UINT inline BitCount(UINT Moves)
-{
-	if (Moves == 0)
-		return 0;
-	return aBitCount[(Moves & 65535)] + aBitCount[((Moves >> 16) & 65535)];
 }
 
 // Find the "lowest" 1 bit of a 32-bit int
@@ -439,58 +405,6 @@ UINT SCheckerBoard::GetJumpersBlack()
 
 //
 
-// note : Moves[0] is empty, the first move is Moves[1]
-struct CMoveList
-{
-	// DATA
-	int numMoves;
-	int numJumps;
-	SMove m_JumpMove;
-	SMove Moves[36];
-
-	// FUNCTIONS
-	void inline Clear()
-	{
-		numJumps = 0;
-		numMoves = 0;
-	}
-
-	void inline StartJumpMove(int src, int dst)
-	{
-		m_JumpMove.SrcDst = (src) + (dst << 6) + (1 << 12);
-	}
-
-	void inline AddJump(SMove &Move, int pathNum)
-	{
-		assert(pathNum < 10);
-		assert(numJumps < 36);
-
-		Move.cPath[pathNum] = 33;
-		Moves[++numJumps] = Move;
-	}
-
-	void inline AddMove(int src, int dst)
-	{
-		assert(numMoves < 36);
-
-		Moves[++numMoves].SrcDst = (src) + (dst << 6);
-		return;
-	}
-
-	int inline AddSqDirBlack(SCheckerBoard &C, int square, const UINT isKing, int pathNum, const int DIR);
-	int inline AddSqDirWhite(SCheckerBoard &C, int square, const UINT isKing, int pathNum, const int DIR);
-	void inline CheckJumpDirBlack(SCheckerBoard &C, int square, const int DIR);
-	void inline CheckJumpDirWhite(SCheckerBoard &C, int square, const int DIR);
-	void FindMovesBlack(SCheckerBoard &C);
-	void FindMovesWhite(SCheckerBoard &C);
-	void FindJumpsBlack(SCheckerBoard &C, int Movers);
-	void FindJumpsWhite(SCheckerBoard &C, int Movers);
-	void FindNonJumpsBlack(SCheckerBoard &C, int Movers);
-	void FindNonJumpsWhite(SCheckerBoard &C, int Movers);
-	void inline FindSqJumpsBlack(SCheckerBoard &C, int square, int pathNum, int jumpSquare, const UINT isKing);
-	void inline FindSqJumpsWhite(SCheckerBoard &C, int square, int pathNum, int jumpSquare, const UINT isKing);
-	void inline AddNormalMove(SCheckerBoard &C, int src, int dst);
-};
 
 CMoveList g_Movelist[MAX_SEARCHDEPTH + 1];
 SMove g_GameMoves[MAX_GAMEMOVES];
