@@ -67,7 +67,7 @@ struct CBoard
 	// Data
 	char Sqs105[48];	/* Gui Checkers version 1.05 board representation. */
 	SCheckerBoard C;
-	char nWhite, nBlack, SideToMove, extra;
+	char nWhite, nBlack, SideToMove;
 	short nPSq, eval;
 	unsigned __int64 HashKey;
 };
