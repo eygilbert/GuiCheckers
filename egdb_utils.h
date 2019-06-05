@@ -4,6 +4,24 @@
 #include "egdb.h"
 #include "movegen.h"
 
+
+inline void gui_2_kingsrow_pos(EGDB_BITBOARD &krpos, SCheckerBoard &guipos)
+{
+	krpos.row_reversed.black_man = guipos.BP & ~guipos.K;
+	krpos.row_reversed.black_king = guipos.BP & guipos.K;
+	krpos.row_reversed.white_man = guipos.WP & ~guipos.K;
+	krpos.row_reversed.white_king = guipos.WP & guipos.K;
+}
+
+inline int gui_2_kingsrow_color(int guicolor)
+{
+	if (guicolor == BLACK)
+		return(EGDB_BLACK);
+	else
+		return(EGDB_WHITE);
+}
+
+
 #define MAXREPDEPTH 64
 
 struct MATERIAL {

@@ -225,7 +225,10 @@ int EGDB_INFO::lookup_with_rep_check(BOARD *p, int color, int depth, int maxdept
 		capture = 1;
 	else if (canjump(p, other_color(color)) == 0) {
 		if (depth != 0 || !force_root_search) {
-			value = (*handle->lookup)(handle, (EGDB_BITBOARD *)p, color, 0);
+			EGDB_BITBOARD kingsrow_pos;
+
+			gui_2_kingsrow_pos(kingsrow_pos, *p);
+			value = (*handle->lookup)(handle, &kingsrow_pos, gui_2_kingsrow_color(color), 0);
 			if (value != EGDB_UNKNOWN)
 				return(value);
 		}

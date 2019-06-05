@@ -694,21 +694,21 @@ void init_egdb(char msg[255])
 					case EGDB_KINGSROW32_WLD_TUN:
 						sprintf(msg, "Wait for db init; Kingsrow db, %d pieces, %d mb cache, %d mb hashtable ...",
 							wld.dbpieces, wld_cache_mb, TTable_mb);
-						wld.handle = egdb_open(EGDB_NORMAL, wld.dbpieces, wld_cache_mb, wld_path, log_msg);
+						wld.handle = egdb_open(EGDB_ROW_REVERSED, wld.dbpieces, wld_cache_mb, wld_path, log_msg);
 						wld.dbpieces_1side = 5;
 						break;
 
 					case EGDB_CAKE_WLD:
 						sprintf(msg, "Wait for db init; Cake db, %d pieces, %d mb cache, %d mb hashtable ...",
 							wld.dbpieces, wld_cache_mb, TTable_mb);
-						wld.handle = egdb_open(EGDB_NORMAL, wld.dbpieces, wld_cache_mb, wld_path, log_msg);
+						wld.handle = egdb_open(EGDB_ROW_REVERSED, wld.dbpieces, wld_cache_mb, wld_path, log_msg);
 						wld.dbpieces_1side = 4;
 						break;
 
 					case EGDB_CHINOOK_WLD:
 						sprintf(msg, "Wait for db init; Chinook db, %d pieces, %d mb cache, %d mb hashtable ...",
 							wld.dbpieces, wld_cache_mb, TTable_mb);
-						wld.handle = egdb_open(EGDB_NORMAL, wld.dbpieces, wld_cache_mb, wld_path, log_msg);
+						wld.handle = egdb_open(EGDB_ROW_REVERSED, wld.dbpieces, wld_cache_mb, wld_path, log_msg);
 						if (wld.handle) {
 
 							/* See if he's got the full db, or just the 4x4. */
@@ -728,9 +728,6 @@ void init_egdb(char msg[255])
 						}
 						break;
 
-					case EGDB_KINGSROW32_ITALIAN_WLD:
-					case EGDB_CHINOOK_ITALIAN_WLD:
-					case EGDB_KINGSROW32_ITALIAN_WLD_TUN:
 					default:
 						wld.dbpieces = 0;
 						return;
@@ -767,7 +764,7 @@ void init_egdb(char msg[255])
 					case EGDB_KINGSROW32_MTC:
 					case EGDB_KINGSROW_DTW:
 						aux_pieces = min(aux_pieces, wld.dbpieces);
-						aux = egdb_open(EGDB_NORMAL, aux_pieces, 1, aux_path, log_msg);
+						aux = egdb_open(EGDB_ROW_REVERSED, aux_pieces, 1, aux_path, log_msg);
 						break;
 					}
 				}
