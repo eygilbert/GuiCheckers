@@ -12,9 +12,13 @@ extern const UINT MASK_6TH;
 extern const UINT MASK_7TH;
 extern const UINT MASK_8TH;
 extern const UINT MASK_TOP;
+extern const UINT MASK_ODD_ROW;
 extern const UINT MASK_BOTTOM;
 extern const UINT MASK_TRAPPED_W;
 extern const UINT MASK_TRAPPED_B;
+
+// S[] contains 32-bit bitboards with a single bit for each of the 32 squares (plus 2 invalid squares with no bits set)
+extern const UINT S[34];
 
 struct SMove
 {
@@ -40,6 +44,57 @@ struct SCheckerBoard
 	UINT inline GetJumpersBlack();
 	UINT inline GetMoversWhite();
 	UINT inline GetMoversBlack();
+	int inline GetPiece(int sq) const
+	{
+		if (S[sq] & BP) {
+			return(S[sq] & K) ? BKING : BPIECE;
+		}
+
+		if (S[sq] & WP) {
+			return(S[sq] & K) ? WKING : WPIECE;
+		}
+
+		if (sq >= 32)
+			return INVALID;
+
+		return EMPTY;
+	}
+	// This function will test if a checker needs to be upgraded to a king, and upgrade if necessary
+	void inline CheckKing(const int src, const int dst, int const nPiece)
+	{
+		if (dst <= 3)
+			K |= S[dst];
+
+		if (dst >= 28)
+			K |= S[dst];
+	}
+
+	void inline DoSingleJump(int src, int dst, const int nPiece, const int SideToMove)
+	{
+		int jumpedSq = ((dst + src) >> 1);
+		if (S[jumpedSq] & MASK_ODD_ROW)
+			jumpedSq += 1;	// correct for square number since the jumpedSq sometimes up 1 sometimes down 1 of the average
+		int jumpedPiece = GetPiece(jumpedSq);
+
+		// Update the bitboards
+		UINT BitMove = (S[src] | S[dst]);
+		if (SideToMove == BLACK) {
+			WP ^= BitMove;
+			BP ^= S[jumpedSq];
+			K &= ~S[jumpedSq];
+		}
+		else {
+			BP ^= BitMove;
+			WP ^= S[jumpedSq];
+			K &= ~S[jumpedSq];
+		}
+
+		empty = ~(WP | BP);
+		if (nPiece & KING)
+			K ^= BitMove;
+	}
+
+	void successor(SMove &move, int color);
 };
 
 //
@@ -57,9 +112,6 @@ extern const int INV; // invalid square
 
 // This is a 32x4 ( 32 source squares x 4 move directions ) lookup table that will return the destination square index for the direction
 extern const int nextSq[32 * 4];
-
-// S[] contains 32-bit bitboards with a single bit for each of the 32 squares (plus 2 invalid squares with no bits set)
-extern const UINT S[34];
 
 extern const UINT MASK_EDGES;
 extern const UINT MASK_2CORNER1;
@@ -99,6 +151,16 @@ struct CMoveList
 	{
 		numJumps = 0;
 		numMoves = 0;
+	}
+
+	inline int build_movelist(SCheckerBoard &board, int color)
+	{
+		if (color == WHITE)
+			FindMovesWhite(board);
+		else
+			FindMovesBlack(board);
+	
+		return(numMoves);
 	}
 
 	void inline StartJumpMove(int src, int dst)

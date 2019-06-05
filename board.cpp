@@ -557,7 +557,6 @@ int CBoard::EvaluateBoard(int ahead, int alpha, int beta)
 // ---------------------
 //  Helper Functions for DoMove
 // ---------------------
-const UINT MASK_ODD_ROW = MASK_1ST | MASK_3RD | MASK_5TH | MASK_7TH;
 
 void inline CBoard::DoSingleJump(int src, int dst, const int nPiece)
 {

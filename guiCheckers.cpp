@@ -28,6 +28,8 @@
 #include "cb_interface.h"
 #include "logfile.h"
 #include "registry.h"
+#include "egdb.h"
+#include "egdb_utils.h"
 
 #define WHITE			2
 #define BLACK			1				// Black == Red
@@ -119,8 +121,20 @@ int g_nSelSquare = NONE;
 char g_buffer[32768];					// For PDN copying/pasting/loading/saving
 
 SDatabaseInfo g_dbInfo;
-char db_path[260] = "db_dtw";
+EGDB_INFO wld;
+EGDB_DRIVER *aux;
+EGDB_TYPE wld_egdb_type;
+EGDB_TYPE aux_egdb_type;
+int aux_pieces;
+char wld_path[260] = "db_dtw";
+char aux_path[260];
 int enable_wld = 1;
+int enable_aux;
+int wld_cache_mb;
+int max_dbpieces;
+int did_egdb_init;
+int request_wld_init;
+int request_aux_init;
 
 //------------------------
 // includes
@@ -336,9 +350,9 @@ const char *GetInfoString()
 		sprintf(displayString, "No Database Loaded\n");
 	else {
 		sprintf(displayString,
-				"Database : %d-man %s\n",
+				"Database : %d-piece %s\n",
 				g_dbInfo.numPieces,
-				g_dbInfo.type == DB_WIN_LOSS_DRAW ? "Win/Loss/Draw" : "Perfect Play");
+				g_dbInfo.type == DB_WIN_LOSS_DRAW ? "Win/Loss/Draw" : "Trice DTW");
 	}
 
 	if (pBook)
@@ -469,28 +483,155 @@ DWORD WINAPI ThinkingThread(void * /* param */ )
 	CloseHandle(hThread);
 }
 
+/*
+ * Return the size of installed RAM in mbytes.
+ */
+int get_mem_installed()
+{
+	MEMORYSTATUSEX memstatus;
+	int ramsize;
+
+	memstatus.dwLength = sizeof(memstatus);
+	if (GlobalMemoryStatusEx(&memstatus)) {
+
+		/* Convert physical memory to mbytes. */
+		ramsize = (int)(memstatus.ullTotalPhys / (1024 * 1024));
+	}
+	else
+		ramsize = 256;			/* Just say something small. */
+	return(ramsize);
+}
+
+void get_dflt_buffer_sizes(int mem_installed, int *dflt_egdb_cache, int *dflt_hashsize)
+{
+	int i, best_setting, smallest_diff;
+
+	if (mem_installed > 16000) {
+		*dflt_hashsize = 128;
+		*dflt_egdb_cache = (int)mem_installed - *dflt_hashsize - 3500;
+	}
+	else if (mem_installed > 8000) {
+		*dflt_hashsize = 128;
+		*dflt_egdb_cache = (int)mem_installed - *dflt_hashsize - 2200;
+	}
+	else if (mem_installed > 6000) {
+		*dflt_hashsize = 128;
+		*dflt_egdb_cache = (int)mem_installed - *dflt_hashsize - 1900;
+	}
+	else if (mem_installed > 4000) {
+		*dflt_hashsize = 128;
+		*dflt_egdb_cache = (int)mem_installed - *dflt_hashsize - 1500;
+	}
+	else if (mem_installed > 2000) {
+		*dflt_hashsize = 128;
+		*dflt_egdb_cache = (int)mem_installed - *dflt_hashsize - 700;
+	}
+	else if (mem_installed < 250) {
+		*dflt_hashsize = 32;
+		*dflt_egdb_cache = (int)mem_installed - *dflt_hashsize - 150;
+		if (*dflt_egdb_cache < 32)
+			* dflt_egdb_cache = 32;
+	}
+	else if (mem_installed < 700) {
+		*dflt_hashsize = 32;
+		*dflt_egdb_cache = (int)mem_installed - *dflt_hashsize - 300;
+		if (*dflt_egdb_cache < 32)
+			* dflt_egdb_cache = 32;
+	}
+	else {
+		/* Between 700 and 2000 mbytes. */
+		*dflt_hashsize = 64;
+		*dflt_egdb_cache = (int)mem_installed - *dflt_hashsize - 400;
+	}
+#ifndef _WIN64
+	/* Assume that /3GB switch is not present for 32-bit version. */
+	if (*dflt_egdb_cache > (1800 - *dflt_hashsize))
+		* dflt_egdb_cache = 1800 - *dflt_hashsize;
+#endif
+
+	/* Max dflt cache size is 16384mb (diminishing returns from using more). */
+	* dflt_egdb_cache = min(*dflt_egdb_cache, 16384);
+
+	/* Round dflt_egdb_cache to the closest CheckerBoard setting. */
+	best_setting = 0;
+	smallest_diff = mem_installed;
+	for (i = 0; i < mem_installed - 64; i += 32) {
+		if (i > 16384 && (i % 1024))
+			continue;
+		if (i > 4096 && (i % 256))
+			continue;
+		if (abs(i - *dflt_egdb_cache) < smallest_diff) {
+			smallest_diff = abs(i - *dflt_egdb_cache);
+			best_setting = i;
+		}
+	}
+	*dflt_egdb_cache = best_setting;
+}
+
+
+void log_egdb_mem_settings()
+{
+	log_msg("WLD cachesize: %d\n", wld_cache_mb);
+	log_msg("limit max WLD pieces: %d\n", max_dbpieces);
+	log_msg("WLD directory: %s\n", wld_path);
+	log_msg("Aux directory: %s\n", aux_path);
+	log_msg("WLD enable: %d\n", enable_wld);
+	log_msg("Aux enable: %d\n\n", enable_aux);
+}
+
+
 //
 // ENGINE INITILIZATION
 //
 // status_str is NULL if not called from CheckerBoard
-
 //
 void InitEngine(char *status_str)
 {
-#ifdef LOG_TIME_MGMT
-	init_logfile();
-#endif
-	InitBitTables();
+	static bool did_init = false;
+	int mem_installed, dflt_egdb_cache, dflt_hashsize;
+	time_t aclock;
+	struct tm* newtime;
+	char msg[MAX_PATH + 30];
+	char current_dir[MAX_PATH];
 
+	/* Only call init once. */
+	if (did_init)
+		return;
+
+	did_init = true;
+	init_logfile("GuiCheckers", "GuiCheckers.log");
+	time(&aclock);						/* Get time in seconds */
+	newtime = localtime(&aclock);		/* Convert time to struct tm form */
+	log_msg(asctime(newtime));
+
+	/* Write engine name to the log file. */
+	enginecommand("name", msg);
+	log_msg("%s\n", msg);
+
+	mem_installed = get_mem_installed();
+	log_msg("installed RAM: %dmb\n", mem_installed);
+	GetCurrentDirectory(sizeof(current_dir) - 1, current_dir);
+	log_msg("current directory: %s\n", current_dir);
+
+	InitBitTables();
 	TEntry::Create_HashFunction();
 
 	if (bCheckerBoard) {
-		get_hashsize(&TTable_mb);
-		get_dbpath(db_path, sizeof(db_path));
+		get_dbpath(wld_path, sizeof(wld_path));
 		get_enable_wld(&enable_wld);
 		get_book_setting(&use_opendb);
+		if (get_max_dbpieces(&max_dbpieces))
+			save_max_dbpieces(24);		/* Set to no limit. */
+		
+		/* If cant find egdb cache size or hashtable size in registry, set them to reasonable defaults. */
+		if (get_dbmbytes(&wld_cache_mb) || get_hashsize(&TTable_mb)) {
+			get_dflt_buffer_sizes(mem_installed, &dflt_egdb_cache, &dflt_hashsize);
+			wld_cache_mb = dflt_egdb_cache;
+			save_dbmbytes(wld_cache_mb);			/* Have to save both this and hashsize to avoid using defaults on the next session. */
+			TTable_mb = dflt_hashsize;
+			save_hashsize(TTable_mb);
+		}
 	}
-
 	if (set_ttable_size(TTable_mb))
 		set_ttable_size(64);
 
@@ -506,10 +647,6 @@ void InitEngine(char *status_str)
 		pBook->LoadFEN("opening.fen");
 #endif
 
-	// Load Databases
-	// InitializeEdsDatabases( g_dbInfo );
-	//if ( !g_dbInfo.loaded )
-	//InitializeGuiDatabases( g_dbInfo );
 	if (!g_dbInfo.loaded && enable_wld) {
 		if (status_str)
 			sprintf(status_str, "Initializing endgame db...");
@@ -526,6 +663,123 @@ void InitEngine(char *status_str)
 			MessageBox(MainWnd, "Cannot Create Thread", "Error", MB_OK);
 		}
 	}
+}
+
+
+void init_egdb(char msg[255])
+{
+	if (!did_egdb_init || request_wld_init || request_aux_init) {
+		log_egdb_mem_settings();
+		if (!did_egdb_init || request_wld_init) {
+			request_wld_init = 0;
+			request_aux_init = 1;
+			if (wld.handle) {
+				wld.handle->close(wld.handle);
+				wld.clear();
+			}
+			if (aux) {
+				aux->close(aux);
+				aux = 0;
+			}
+			if (enable_wld) {
+				int egdb_found;
+
+				egdb_found = !egdb_identify(wld_path, &wld_egdb_type, &wld.dbpieces);
+				wld.dbpieces = min(max_dbpieces, wld.dbpieces);
+				if (egdb_found) {
+					log_msg("Found db type %d in %s\n", wld_egdb_type, wld_path);
+
+					switch (wld_egdb_type) {
+					case EGDB_KINGSROW32_WLD:
+					case EGDB_KINGSROW32_WLD_TUN:
+						sprintf(msg, "Wait for db init; Kingsrow db, %d pieces, %d mb cache, %d mb hashtable ...",
+							wld.dbpieces, wld_cache_mb, TTable_mb);
+						wld.handle = egdb_open(EGDB_NORMAL, wld.dbpieces, wld_cache_mb, wld_path, log_msg);
+						wld.dbpieces_1side = 5;
+						break;
+
+					case EGDB_CAKE_WLD:
+						sprintf(msg, "Wait for db init; Cake db, %d pieces, %d mb cache, %d mb hashtable ...",
+							wld.dbpieces, wld_cache_mb, TTable_mb);
+						wld.handle = egdb_open(EGDB_NORMAL, wld.dbpieces, wld_cache_mb, wld_path, log_msg);
+						wld.dbpieces_1side = 4;
+						break;
+
+					case EGDB_CHINOOK_WLD:
+						sprintf(msg, "Wait for db init; Chinook db, %d pieces, %d mb cache, %d mb hashtable ...",
+							wld.dbpieces, wld_cache_mb, TTable_mb);
+						wld.handle = egdb_open(EGDB_NORMAL, wld.dbpieces, wld_cache_mb, wld_path, log_msg);
+						if (wld.handle) {
+
+							/* See if he's got the full db, or just the 4x4. */
+							if (wld.dbpieces > 6) {
+								int val;
+								BOARD testpos = { 3, 0xf1000000, 0 };
+
+								val = (*wld.handle->lookup)(wld.handle, (EGDB_BITBOARD*)& testpos, EGDB_WHITE, 0);
+								if (val == EGDB_WIN)
+									wld.dbpieces_1side = 7;
+								else
+									wld.dbpieces_1side = 4;
+							}
+							else
+								/* Use the full 6pc db. */
+								wld.dbpieces_1side = 5;
+						}
+						break;
+
+					case EGDB_KINGSROW32_ITALIAN_WLD:
+					case EGDB_CHINOOK_ITALIAN_WLD:
+					case EGDB_KINGSROW32_ITALIAN_WLD_TUN:
+					default:
+						wld.dbpieces = 0;
+						return;
+					}
+
+					if (!wld.handle) {
+						wld.clear();
+						sprintf(msg, "Cannot open endgame db driver.");
+						Sleep(3000);
+						sprintf(msg, "See %s for details", logfilename());
+						Sleep(10000);
+					}
+				}
+				else {
+					log_msg("Cannot find database in %s\n", wld_path);
+					wld.clear();
+					sprintf(msg, "Cannot find endgame database files.");
+					Sleep(5000);
+				}
+			}
+		}
+
+		if (!did_egdb_init || request_aux_init) {
+			request_aux_init = 0;
+			if (aux) {
+				aux->close(aux);
+				aux = 0;
+			}
+			if (wld.handle && aux_path[0] && enable_aux) {
+				sprintf(msg, "Opening aux db; %s", aux_path);
+				if (!egdb_identify(aux_path, &aux_egdb_type, &aux_pieces)) {
+					log_msg("Found db type %d in %s\n", aux_egdb_type, aux_path);
+					switch (aux_egdb_type) {
+					case EGDB_KINGSROW32_MTC:
+					case EGDB_KINGSROW_DTW:
+						aux_pieces = min(aux_pieces, wld.dbpieces);
+						aux = egdb_open(EGDB_NORMAL, aux_pieces, 1, aux_path, log_msg);
+						break;
+					}
+				}
+				else {
+					log_msg("Cannot find database in %s\n", aux_path);
+				}
+			}
+			if (!aux)
+				aux_pieces = 0;
+		}
+	}
+	did_egdb_init = 1;
 }
 
 // INITIALIZATION FUNCTION
@@ -1382,13 +1636,11 @@ int WINAPI getmove
 	double remaining, increment, desired;
 	static int nDraw = 0, Eval = 0;
 
-	if (!bCheckerBoard) {
+	bCheckerBoard = TRUE;
 
-		// initialization
-		bCheckerBoard = TRUE;
-		InitEngine(str);
-		g_numMoves = 0;
-	}
+	// initialization
+	InitEngine(str);
+	init_egdb(str);
 
 	if (g_numMoves > 500)
 		g_numMoves = 0;
@@ -1474,7 +1726,7 @@ int WINAPI getmove
 			tag = "*";
 		else
 			tag = "";
-		log("incr %.1f, remaining %.3f, abs maxt %.3f, desired %.3f, new iter maxt %.3f, actual %.3f, margin %.3f %s\n",
+		log_msg("incr %.1f, remaining %.3f, abs maxt %.3f, desired %.3f, new iter maxt %.3f, actual %.3f, margin %.3f %s\n",
 		increment,
 			remaining,
 			fMaxSeconds,
@@ -1558,12 +1810,12 @@ int WINAPI enginecommand(char str[256], char reply[1024])
 				++p;
 			while (isspace(*p))
 				++p;
-			if (strcmp(p, db_path)) {
-				strcpy(db_path, p);
-				save_dbpath(db_path);
+			if (strcmp(p, wld_path)) {
+				strcpy(wld_path, p);
+				save_dbpath(wld_path);
 			}
 
-			sprintf(reply, "dbpath set to %s", db_path);
+			sprintf(reply, "dbpath set to %s", wld_path);
 			return(1);
 		}
 
@@ -1572,6 +1824,7 @@ int WINAPI enginecommand(char str[256], char reply[1024])
 			if (val != enable_wld) {
 				enable_wld = val;
 				save_enable_wld(enable_wld);
+				request_wld_init = 1;
 				if (!g_dbInfo.loaded && enable_wld) {
 					sprintf(reply, "Initializing endgame db...");
 					InitializeEdsDatabases(g_dbInfo);
@@ -1590,6 +1843,28 @@ int WINAPI enginecommand(char str[256], char reply[1024])
 			}
 
 			sprintf(reply, "book set to %d", use_opendb);
+			return(1);
+		}
+
+		if (strcmp(param1, "max_dbpieces") == 0) {
+			val = strtol(param2, &stopstring, 10);
+			if (val != max_dbpieces) {
+				max_dbpieces = val;
+				save_max_dbpieces(max_dbpieces);
+			}
+
+			sprintf(reply, "max_dbpieces set to %d", max_dbpieces);
+			return(1);
+		}
+		
+		if (strcmp(param1, "dbmbytes") == 0) {
+			val = strtol(param2, &stopstring, 10);
+			if (val != wld_cache_mb) {
+				wld_cache_mb = val;
+				save_dbmbytes(wld_cache_mb);
+			}
+
+			sprintf(reply, "dbmbytes set to %d", wld_cache_mb);
 			return(1);
 		}
 	}
@@ -1612,8 +1887,8 @@ int WINAPI enginecommand(char str[256], char reply[1024])
 		}
 
 		if (strcmp(param1, "dbpath") == 0) {
-			get_dbpath(db_path, sizeof(db_path));
-			sprintf(reply, db_path);
+			get_dbpath(wld_path, sizeof(wld_path));
+			sprintf(reply, wld_path);
 			return(1);
 		}
 
@@ -1626,6 +1901,18 @@ int WINAPI enginecommand(char str[256], char reply[1024])
 		if (strcmp(param1, "book") == 0) {
 			get_book_setting(&use_opendb);
 			sprintf(reply, "%d", use_opendb);
+			return(1);
+		}
+
+		if (strcmp(param1, "max_dbpieces") == 0) {
+			get_max_dbpieces(&max_dbpieces);
+			sprintf(reply, "%d", max_dbpieces);
+			return(1);
+		}
+
+		if (strcmp(param1, "dbmbytes") == 0) {
+			get_dbmbytes(&wld_cache_mb);
+			sprintf(reply, "%d", wld_cache_mb);
 			return(1);
 		}
 	}

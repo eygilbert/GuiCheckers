@@ -218,6 +218,7 @@ const UINT MASK_5TH = S[16] | S[17] | S[18] | S[19];
 const UINT MASK_6TH = S[20] | S[21] | S[22] | S[23];
 const UINT MASK_7TH = S[24] | S[25] | S[26] | S[27];
 const UINT MASK_8TH = S[28] | S[29] | S[30] | S[31];
+const UINT MASK_ODD_ROW = MASK_1ST | MASK_3RD | MASK_5TH | MASK_7TH;
 const UINT MASK_EDGES = S[24] |
 	S[20] |
 	S[16] |
@@ -397,6 +398,56 @@ UINT SCheckerBoard::GetJumpersBlack()
 	}
 
 	return Movers;
+}
+
+void SCheckerBoard::successor(SMove &move, int color)
+{
+	int SideToMove = other_color(color);
+	unsigned int src = (move.SrcDst & 63);
+	unsigned int dst = (move.SrcDst >> 6) & 63;
+	unsigned int bJump = (move.SrcDst >> 12);
+	unsigned int nPiece = GetPiece(src);	// FIXME : AVOID GET PIECE HERE
+	
+	if (bJump == 0) {
+
+		// Update the bitboards
+		UINT BitMove = S[src] | S[dst];
+		if (SideToMove == BLACK)
+			WP ^= BitMove;
+		else
+			BP ^= BitMove;
+		if (nPiece & KING)
+			K ^= BitMove;
+		empty ^= BitMove;
+
+		if (nPiece < KING) {
+			CheckKing(src, dst, nPiece);
+			return;
+		}
+
+		return;
+	}
+
+	DoSingleJump(src, dst, nPiece, SideToMove);
+	if (nPiece < KING)
+		CheckKing(src, dst, nPiece);
+
+	// Double Jump?
+	if (move.cPath[0] == 33)
+		return;
+
+	for (int i = 0; i < 8; i++) {
+		int nDst = move.cPath[i];
+
+		if (nDst == 33)
+			break;
+
+		DoSingleJump(dst, nDst, nPiece, SideToMove);
+		dst = nDst;
+	}
+
+	if (nPiece < KING)
+		CheckKing(src, dst, nPiece);
 }
 
 //
@@ -643,3 +694,5 @@ void CMoveList::FindSqJumpsWhite(SCheckerBoard &C, int square, int pathNum, int 
 
 	C.BP = oldBP;
 }
+
+

@@ -3034,7 +3034,7 @@ void init_g_piece_counts_to_local_slice(void)
 int LoadSingleDatabase( const char *filename, unsigned char** sliceData, int bytes_needed_for_db_slice )
 {
 	char fullFilename[512];
-	sprintf( fullFilename, "%s/%s", db_path, filename );
+	sprintf( fullFilename, "%s/%s", wld_path, filename );
 	assert( *sliceData == NULL );
 
 	FILE *db_file = fopen( fullFilename ,"rb");

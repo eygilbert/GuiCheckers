@@ -80,6 +80,7 @@ void DisplaySearchInfo(CBoard &InBoard, int SearchDepth, int Eval, unsigned long
 void RunningDisplay(int bestmove, int bSearching);
 void ReplayGame(int nMove, CBoard &Board);
 int MakeMovePDN(CBoard &Board, int src, int dst);
+int WINAPI enginecommand(char str[256], char reply[1024]);
 
 // GUI Data
 extern int hashing;
@@ -100,7 +101,7 @@ struct SDatabaseInfo
 };
 
 extern SDatabaseInfo g_dbInfo;
-extern char db_path[260];
+extern char wld_path[260];
 extern int enable_wld;
 
 
@@ -110,3 +111,9 @@ extern int enable_wld;
 extern const char* GetNodeCount(unsigned long long count, int nBuf);
 void RunningDisplay(int bestMove, int bSearching);
 void DisplayText(const char* sText);
+
+inline int other_color(int color)
+{
+	return(color ^ (BLACK | WHITE));
+}
+
