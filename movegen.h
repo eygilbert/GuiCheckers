@@ -1,5 +1,6 @@
 #pragma once
 #include <Windows.h>
+#include <stdint.h>
 #include <assert.h>
 #include "guiCheckers.h"
 
@@ -16,6 +17,10 @@ extern const UINT MASK_ODD_ROW;
 extern const UINT MASK_BOTTOM;
 extern const UINT MASK_TRAPPED_W;
 extern const UINT MASK_TRAPPED_B;
+
+extern const uint32_t sq1, sq2, sq3, sq4, sq5, sq6, sq7, sq8, sq9, sq10, sq11, sq12, sq13, sq14, sq15, sq16,
+			sq17, sq18, sq19, sq20, sq21, sq22, sq23, sq24, sq25, sq26, sq27, sq28, sq29, sq30, sq31, sq32;
+
 
 // S[] contains 32-bit bitboards with a single bit for each of the 32 squares (plus 2 invalid squares with no bits set)
 extern const UINT S[34];

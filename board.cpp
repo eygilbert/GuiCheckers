@@ -9,6 +9,8 @@
 #include "database.h"
 #include "edDatabase.h"
 #include "movegen.h"
+#include "egdb.h"
+#include "egdb_utils.h"
 
 const int KING_VAL = 33;
 const int KV = KING_VAL;
@@ -311,6 +313,8 @@ void CBoard::SetFlags()
 // ------------------
 const int LAZY_EVAL_MARGIN = 64;
 
+extern EGDB_INFO wld;
+
 int CBoard::EvaluateBoard(int ahead, int alpha, int beta)
 {
 	// Game is over?
@@ -328,6 +332,21 @@ int CBoard::EvaluateBoard(int ahead, int alpha, int beta)
 			// If we get an exact score from the database we want to return right away
 			databaseNodes++;
 			return value;
+		}
+	}
+
+	if (wld.handle && wld.is_lookup_possible(&C, SideToMove)) {
+		int value, egdb_value;
+		EGDB_BITBOARD kingsrow_pos;
+
+		gui_2_kingsrow_pos(kingsrow_pos, C);
+		egdb_value = (*wld.handle->lookup)(wld.handle, &kingsrow_pos, gui_2_kingsrow_color(SideToMove), 1);
+
+		if (egdb_value == EGDB_DRAW)
+			return(0);
+		if (egdb_value == EGDB_WIN || egdb_value == EGDB_LOSS) {
+			value = egdb_eval(&C, SideToMove, egdb_value);
+			return(value);
 		}
 	}
 

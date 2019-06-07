@@ -3565,7 +3565,7 @@ int QueryEdsDatabase( const CBoard &Board, int ahead )
 /*                                            */
 /**********************************************/
 
-void InitializeEdsDatabases( SDatabaseInfo &dbInfo )
+bool InitializeEdsDatabases( SDatabaseInfo &dbInfo )
 {
 	// fill out info structure
 	dbInfo.numPieces = 6;
@@ -3575,4 +3575,5 @@ void InitializeEdsDatabases( SDatabaseInfo &dbInfo )
 
 	// Load the databases
 	dbInfo.loaded = LoadEdsDatabase();
+	return(dbInfo.loaded);
 }

@@ -22,6 +22,41 @@
 // 08 09 10 11
 //  04 05 06 07
 // 00 01 02 03
+
+const uint32_t sq1 = 1 << 3;
+const uint32_t sq2 = 1 << 2;
+const uint32_t sq3 = 1 << 1;
+const uint32_t sq4 = 1 << 0;
+const uint32_t sq5 = 1 << 7;
+const uint32_t sq6 = 1 << 6;
+const uint32_t sq7 = 1 << 5;
+const uint32_t sq8 = 1 << 4;
+const uint32_t sq9 = 1 << 11;
+const uint32_t sq10 = 1 << 10;
+const uint32_t sq11 = 1 << 9;
+const uint32_t sq12 = 1 << 8;
+const uint32_t sq13 = 1 << 15;
+const uint32_t sq14 = 1 << 14;
+const uint32_t sq15 = 1 << 13;
+const uint32_t sq16 = 1 << 12;
+const uint32_t sq17 = 1 << 19;
+const uint32_t sq18 = 1 << 18;
+const uint32_t sq19 = 1 << 17;
+const uint32_t sq20 = 1 << 16;
+const uint32_t sq21 = 1 << 23;
+const uint32_t sq22 = 1 << 22;
+const uint32_t sq23 = 1 << 21;
+const uint32_t sq24 = 1 << 20;
+const uint32_t sq25 = 1 << 27;
+const uint32_t sq26 = 1 << 26;
+const uint32_t sq27 = 1 << 25;
+const uint32_t sq28 = 1 << 24;
+const uint32_t sq29 = 1 << 31;
+const uint32_t sq30 = 1 << 30;
+const uint32_t sq31 = 1 << 29;
+const uint32_t sq32 = 1 << 28;
+
+
 const int INV = 33; // invalid square
 
 // This is a 32x4 ( 32 source squares x 4 move directions ) lookup table that will return the destination square index for the direction

@@ -1,3 +1,5 @@
+#include "egdb.h"
+#include "egdb_utils.h"
 #include "guiCheckers.h"
 #include "board.h"
 #include "obook.h"
@@ -5,6 +7,7 @@
 float g_fPanic;
 CBoard g_Boardlist[MAX_SEARCHDEPTH + 1];
 
+extern EGDB_INFO wld;
 
 // ===============================================
 //					 SEARCH
@@ -177,6 +180,32 @@ short ABSearch(int color, int ahead, int depth, int fracDepth, short alpha, shor
 			return 2001 - ahead;
 	}
 
+	/* Try probing the WLD db, see if we can get a cutoff. */
+	if (ahead > 1 && wld.handle && wld.is_lookup_possible(&g_Boardlist[ahead - 1].C, color)) {
+		int egdb_value;
+		EGDB_BITBOARD kingsrow_pos;
+
+		gui_2_kingsrow_pos(kingsrow_pos, g_Boardlist[ahead - 1].C);
+		egdb_value = (*wld.handle->lookup)(wld.handle, &kingsrow_pos, gui_2_kingsrow_color(color), depth <= 4);
+
+		if (egdb_value == EGDB_DRAW)
+			return(0);
+#if 0
+		if (egdb_value == EGDB_WIN || egdb_value == EGDB_LOSS) {
+			value = egdb_eval(&g_Boardlist[ahead - 1].C, color, egdb_value);
+
+			if (color == WHITE) {
+				if (value >= beta)
+					return(beta);
+			}
+			else {
+				if (value <= alpha)
+					return(alpha);
+			}
+		}
+#endif
+	}
+
 	// Run through the g_Movelist, doing each move
 	for (i = 0; i <= g_Movelist[ahead].numMoves; i++) {
 
@@ -340,7 +369,7 @@ short ABSearch(int color, int ahead, int depth, int fracDepth, short alpha, shor
 			bestmove = nM;
 			beta = value;
 			if (alpha >= beta)
-				return alpha;
+				return beta;
 		}
 	}			// end for
 

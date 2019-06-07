@@ -5,6 +5,8 @@
 #include "movegen.h"
 
 
+typedef SCheckerBoard BOARD;
+
 inline void gui_2_kingsrow_pos(EGDB_BITBOARD &krpos, SCheckerBoard &guipos)
 {
 	krpos.row_reversed.black_man = guipos.BP & ~guipos.K;
@@ -21,6 +23,7 @@ inline int gui_2_kingsrow_color(int guicolor)
 		return(EGDB_WHITE);
 }
 
+int egdb_eval(BOARD *board, int color, int egdb_value);
 
 #define MAXREPDEPTH 64
 
@@ -28,9 +31,6 @@ struct MATERIAL {
 	int npieces;
 	int npieces_1_side;
 };
-
-typedef SCheckerBoard BOARD;
-typedef uint32_t BITBOARD;
 
 inline bool canjump(BOARD *board, int color)
 {
@@ -55,8 +55,8 @@ public:
 		msg_fn = NULL;
 		timeout = 0;
 	}
-	bool is_lookup_possible_pieces(MATERIAL *mat);
-	bool is_lookup_possible(BOARD *board, int color, MATERIAL *mat);
+	bool is_lookup_possible_pieces(int npieces, int npieces_1side);
+	bool is_lookup_possible(BOARD *board, int color);
 	int lookup_with_search(BOARD *p, int color, bool force_root_search);
 	int get_maxdepth() { return(maxdepth_reached); }
 	void set_maxnodes(int nodes) { maxnodes = nodes; }

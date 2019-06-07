@@ -6,6 +6,7 @@
 #include <io.h>
 #include <setjmp.h>
 #include "board.h"
+#include "movegen.h"
 #include "egdb.h"
 #include "egdb_utils.h"
 
@@ -14,15 +15,17 @@
  * Return true if a db lookup is possible based only on the number of men and kings present
  * (ignoring capture restrictions).
  */
-bool EGDB_INFO::is_lookup_possible_pieces(MATERIAL *mat)
+bool EGDB_INFO::is_lookup_possible_pieces(int npieces, int npieces_1side)
 {
-	return(mat->npieces <= dbpieces && mat->npieces_1_side <= dbpieces_1side);
+	return(npieces <= dbpieces && npieces_1side <= dbpieces_1side);
 }
 
 
-bool EGDB_INFO::is_lookup_possible(BOARD *board, int color, MATERIAL *mat)
+bool EGDB_INFO::is_lookup_possible(BOARD *board, int color)
 {
-	if (!is_lookup_possible_pieces(mat))
+	int npieces = BitCount(board->BP | board->WP);
+	int npieces_1side = max(BitCount(board->BP), BitCount(board->WP));
+	if (!is_lookup_possible_pieces(npieces, npieces_1side))
 		return(false);
 	if (canjump(board, color))
 		return(false);
@@ -166,7 +169,7 @@ int EGDB_INFO::bestvalue_improve(int value, int bestvalue)
 bool is_repetition(BOARD *history, BOARD *p, int depth)
 {
 	int i;
-	BITBOARD men, earlier_men;
+	uint32_t men, earlier_men;
 
 	men = (p->BP | p->WP) & ~p->K;
 	for (i = depth - 4; i >= 0; i -= 4) {
@@ -366,4 +369,112 @@ void EGDB_INFO::log_tree(int value, int depth, int color)
 	printf("value %d, depth %d\n", value, depth);
 #endif
 }
+
+
+inline int black_tempo(uint32_t bm)
+{
+	return((4 * BitCount((MASK_5TH | MASK_6TH | MASK_7TH) & (bm))) +
+		(2 * BitCount((MASK_3RD | MASK_4TH | MASK_7TH) & (bm))) +
+		BitCount((MASK_2ND | MASK_4TH | MASK_6TH) & (bm)));
+}
+
+
+inline int white_tempo(uint32_t wm)
+{
+	return((4 * BitCount((MASK_4TH | MASK_3RD | MASK_2ND) & (wm))) +
+		(2 * BitCount((MASK_6TH | MASK_5TH | MASK_2ND) & (wm))) +
+		BitCount((MASK_7TH | MASK_5TH | MASK_3RD) & (wm)));
+}
+
+
+const uint32_t center_squares = sq10 | sq11 | sq14 | sq15 | sq18 | sq19 | sq22 | sq23;
+const uint32_t edge_squares = sq1 | sq2 | sq3 | sq4 | sq12 | sq20 | sq28 | sq32 | sq31 | sq30 | sq29 | sq21 | sq13 | sq5;
+
+int egdb_black_win_eval(BOARD *board)
+{
+	int nbm, nbk, nwm, nwk, tempo, edge, center;
+	int value;
+
+	nbm = BitCount(board->BP & ~board->K);
+	nbk = BitCount(board->BP & board->K);
+	nwm = BitCount(board->WP & ~board->K);
+	nwk = BitCount(board->WP & board->K);
+	edge = BitCount((board->WP & board->K) & edge_squares);
+	center = BitCount((board->BP & board->K) & center_squares);
+	tempo = black_tempo(board->BP & ~board->K);
+
+	/* If equal material, black wants white men to advance. */
+	if (nbm + nbk == nwm + nwk)
+		tempo += white_tempo(board->WP & ~board->K);
+
+	value = -1700 + 60 * (nbm + nwm) + 30 * (nbk + nwk);
+	value -= tempo;
+	value -= (center + edge);
+	return(value);
+}
+
+
+int egdb_white_win_eval(BOARD *board)
+{
+	int nbm, nbk, nwm, nwk, tempo, edge, center;
+	int value;
+
+	nbm = BitCount(board->BP & ~board->K);
+	nbk = BitCount(board->BP & board->K);
+	nwm = BitCount(board->WP & ~board->K);
+	nwk = BitCount(board->WP & board->K);
+	edge = BitCount((board->BP & board->K) & edge_squares);
+	center = BitCount((board->WP & board->K) & center_squares);
+	tempo = white_tempo(board->WP & ~board->K);
+
+	/* If equal material, white wants black men to advance. */
+	if (nbm + nbk == nwm + nwk)
+		tempo += black_tempo(board->BP & ~board->K);
+
+	value = 1700 - 60 * (nbm + nwm) - 30 * (nbk + nwk);
+	value += tempo;
+	value += (center + edge);
+	return(value);
+}
+
+
+int egdb_eval(BOARD *board, int color, int egdb_value)
+{
+	/* Eval for a BLACK color, db win. */
+	if (color == BLACK) {
+		switch (egdb_value) {
+		case EGDB_WIN:
+			/* Black win. */
+			egdb_value = egdb_black_win_eval(board);
+			return(egdb_value);
+
+		case EGDB_LOSS:
+			/* White win. */
+			egdb_value = egdb_white_win_eval(board);
+			return(egdb_value);
+
+		default:
+			return(0);
+		}
+	}
+	else {
+		/* color WHITE */
+		switch (egdb_value) {
+		case EGDB_WIN:
+			/* White win. */
+			egdb_value = egdb_white_win_eval(board);
+			return(egdb_value);
+
+		case EGDB_LOSS:
+			/* Black win. */
+			egdb_value = egdb_black_win_eval(board);
+			return(egdb_value);
+
+		default:
+			return(0);
+		}
+	}
+}
+
+
 

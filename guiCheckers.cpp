@@ -580,6 +580,133 @@ void log_egdb_mem_settings()
 }
 
 
+char *dbname(EGDB_TYPE egdb_type)
+{
+	switch (egdb_type) {
+	case EGDB_KINGSROW32_WLD:
+	case EGDB_KINGSROW32_WLD_TUN:
+	case EGDB_KINGSROW32_MTC:
+	case EGDB_KINGSROW_DTW:
+		return("Kingsrow");
+
+	case EGDB_CAKE_WLD:
+		return("Cake");
+
+	case EGDB_CHINOOK_WLD:
+		return("Chinook");
+	}
+	return("unknown");
+}
+
+
+int is_wld_db(EGDB_TYPE dbtype)
+{
+	switch (dbtype) {
+#ifdef ITALIAN_RULES
+	case EGDB_CHINOOK_ITALIAN_WLD:
+	case EGDB_KINGSROW32_ITALIAN_WLD:
+	case EGDB_KINGSROW32_ITALIAN_WLD_TUN:
+#else
+	case EGDB_KINGSROW32_WLD:
+	case EGDB_KINGSROW32_WLD_TUN:
+	case EGDB_CAKE_WLD:
+	case EGDB_CHINOOK_WLD:
+#endif
+		return(1);
+	}
+	return(0);
+}
+
+
+int is_mtc_db(EGDB_TYPE dbtype)
+{
+	switch (dbtype) {
+#ifdef ITALIAN_RULES
+	case EGDB_KINGSROW32_ITALIAN_MTC:
+#else
+	case EGDB_KINGSROW32_MTC:
+#endif
+		return(1);
+	}
+	return(0);
+}
+
+
+int is_dtw_db(EGDB_TYPE dbtype)
+{
+	switch (dbtype) {
+#ifdef ITALIAN_RULES
+	case EGDB_KINGSROW_ITALIAN_DTW:
+#else
+	case EGDB_KINGSROW_DTW:
+#endif
+		return(1);
+	}
+	return(0);
+}
+
+
+char *auxtype(EGDB_TYPE dbtype)
+{
+	if (is_mtc_db(dbtype))
+		return("MTC");
+	if (is_dtw_db(dbtype))
+		return("DTW");
+	return("");
+}
+
+
+void check_wld_dir(char *dir, char *reply)
+{
+	int status, pieces;
+	EGDB_TYPE dbtype;
+	FILE *fp;
+
+	status = egdb_identify(dir, &dbtype, &pieces);
+	if (status || !is_wld_db(dbtype)) {
+		char filename[MAX_PATH];
+
+		int len;
+		char *sep;
+
+		/* Check for the Trice db. */
+		len = (int)strlen(dir);
+		if (len && (dir[len - 1] != '\\'))
+			sep = "\\";
+		else
+			sep = "";
+
+		sprintf(filename, "%s%sdb_06_(0K3C_0K3C)", dir, sep);
+		fp = fopen(filename, "rb");
+		if (fp) {
+			fclose(fp);
+			sprintf(reply, "Trice DTW database found for 6 pieces");
+		}
+		else
+			sprintf(reply, "No WLD database found in %s", dir);
+	}
+	else
+		sprintf(reply, "%s WLD database found for %d pieces", dbname(dbtype), pieces);
+}
+
+
+void check_mtc_dir(char *dir, char *reply)
+{
+	int status, pieces;
+	EGDB_TYPE dbtype;
+
+	status = egdb_identify(dir, &dbtype, &pieces);
+	if (status)
+		sprintf(reply, "No MTC or DTW database found in %s", dir);
+	else if (is_mtc_db(dbtype))
+		sprintf(reply, "%s MTC database found for %d pieces", dbname(dbtype), pieces);
+	else if (is_dtw_db(dbtype))
+		sprintf(reply, "%s DTW database found for %d pieces", dbname(dbtype), pieces);
+	else
+		sprintf(reply, "No MTC or DTW database found in %s", dir);
+}
+
+
 //
 // ENGINE INITILIZATION
 //
@@ -647,12 +774,6 @@ void InitEngine(char *status_str)
 		pBook->LoadFEN("opening.fen");
 #endif
 
-	if (!g_dbInfo.loaded && enable_wld) {
-		if (status_str)
-			sprintf(status_str, "Initializing endgame db...");
-		InitializeEdsDatabases(g_dbInfo);
-	}
-
 	g_CBoard.StartPosition(1);
 
 	if (!bCheckerBoard) {
@@ -716,7 +837,7 @@ void init_egdb(char msg[255])
 								int val;
 								BOARD testpos = { 3, 0xf1000000, 0 };
 
-								val = (*wld.handle->lookup)(wld.handle, (EGDB_BITBOARD*)& testpos, EGDB_WHITE, 0);
+								val = (*wld.handle->lookup)(wld.handle, (EGDB_BITBOARD*)&testpos, EGDB_WHITE, 0);
 								if (val == EGDB_WIN)
 									wld.dbpieces_1side = 7;
 								else
@@ -742,10 +863,16 @@ void init_egdb(char msg[255])
 					}
 				}
 				else {
-					log_msg("Cannot find database in %s\n", wld_path);
-					wld.clear();
-					sprintf(msg, "Cannot find endgame database files.");
-					Sleep(5000);
+					if (!g_dbInfo.loaded) {
+						sprintf(msg, "Initializing Trice db...");
+						InitializeEdsDatabases(g_dbInfo);
+					}
+					if (!g_dbInfo.loaded) {
+						log_msg("Cannot find database in %s\n", wld_path);
+						wld.clear();
+						sprintf(msg, "Cannot find endgame database files.");
+						Sleep(5000);
+					}
 				}
 			}
 		}
@@ -1758,6 +1885,16 @@ int WINAPI getmove
 	return retVal;
 }
 
+void static_eval_parse(char *fen, char *reply)
+{
+	int value;
+	CBoard board;
+
+	board.FromFen(fen);
+	value = board.EvaluateBoard(1, -4000, 4000);
+	sprintf(reply, "value %d", value);
+}
+
 int WINAPI enginecommand(char str[256], char reply[1024])
 {
 	char command[256], param1[256], param2[256];
@@ -1778,6 +1915,11 @@ int WINAPI enginecommand(char str[256], char reply[1024])
 		// TODO : Print endgame database info
 		sprintf(reply, "%s\nby Jonathan Kreuzer\n\n%s ", g_sNameVer, GetInfoString());
 		return 1;
+	}
+
+	if (strcmp(command, "staticevaluation") == 0) {
+		static_eval_parse(param1, reply);
+		return(1);
 	}
 
 	if (strcmp(command, "set") == 0) {
@@ -1822,10 +1964,6 @@ int WINAPI enginecommand(char str[256], char reply[1024])
 				enable_wld = val;
 				save_enable_wld(enable_wld);
 				request_wld_init = 1;
-				if (!g_dbInfo.loaded && enable_wld) {
-					sprintf(reply, "Initializing endgame db...");
-					InitializeEdsDatabases(g_dbInfo);
-				}
 			}
 
 			sprintf(reply, "enable_wld set to %d", enable_wld);
@@ -1862,6 +2000,11 @@ int WINAPI enginecommand(char str[256], char reply[1024])
 			}
 
 			sprintf(reply, "dbmbytes set to %d", wld_cache_mb);
+			return(1);
+		}
+
+		if (strcmp(param1, "check_wld_dir") == 0) {
+			check_wld_dir(param2, reply);
 			return(1);
 		}
 	}
