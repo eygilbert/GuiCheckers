@@ -64,7 +64,7 @@ const int OFF = 0;
 // GLOBAL VARIABLES... ugg, too many?
 #ifdef USE_ED_TRICE_CODE
 #ifdef DLL_BUILD
-char *g_sNameVer = "Gui Checkers 1.11"; // Checkerboard doesn't handle the longer name well
+char *g_sNameVer = "Gui Checkers 1.12"; // Checkerboard doesn't handle the longer name well
 #else
 char *g_sNameVer = "Gui Checkers 1.11 August 31, 2016 (64-bit conversion by Ed Trice)";
 #endif
@@ -259,6 +259,7 @@ void RunningDisplay(int bestMove, int bSearching)
 				 GetNodeCount(nodes, 0),
 				 GetNodeCount(databaseNodes, 1));
 	DisplayText(sTemp);
+//	log_msg("%s\n", sTemp);
 }
 
 // ---------------------------------------------
@@ -1952,6 +1953,7 @@ int WINAPI enginecommand(char str[256], char reply[1024])
 			if (strcmp(p, wld_path)) {
 				strcpy(wld_path, p);
 				save_dbpath(wld_path);
+				request_wld_init = 1;
 			}
 
 			sprintf(reply, "dbpath set to %s", wld_path);

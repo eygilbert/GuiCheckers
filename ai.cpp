@@ -180,32 +180,6 @@ short ABSearch(int color, int ahead, int depth, int fracDepth, short alpha, shor
 			return 2001 - ahead;
 	}
 
-	/* Try probing the WLD db, see if we can get a cutoff. */
-	if (ahead > 1 && wld.handle && wld.is_lookup_possible(&g_Boardlist[ahead - 1].C, color)) {
-		int egdb_value;
-		EGDB_BITBOARD kingsrow_pos;
-
-		gui_2_kingsrow_pos(kingsrow_pos, g_Boardlist[ahead - 1].C);
-		egdb_value = (*wld.handle->lookup)(wld.handle, &kingsrow_pos, gui_2_kingsrow_color(color), depth <= 4);
-
-		if (egdb_value == EGDB_DRAW)
-			return(0);
-#if 0
-		if (egdb_value == EGDB_WIN || egdb_value == EGDB_LOSS) {
-			value = egdb_eval(&g_Boardlist[ahead - 1].C, color, egdb_value);
-
-			if (color == WHITE) {
-				if (value >= beta)
-					return(beta);
-			}
-			else {
-				if (value <= alpha)
-					return(alpha);
-			}
-		}
-#endif
-	}
-
 	// Run through the g_Movelist, doing each move
 	for (i = 0; i <= g_Movelist[ahead].numMoves; i++) {
 
@@ -263,8 +237,36 @@ short ABSearch(int color, int ahead, int depth, int fracDepth, short alpha, shor
 
 		//If this isn't the max depth continue to look ahead
 		else {
+
 			value = -9999;
 			nextbest = NONE;
+
+			/* Try probing the WLD db, see if we can get a cutoff. */
+			int next_color = g_Boardlist[ahead].SideToMove;
+			SCheckerBoard *next_board = &g_Boardlist[ahead].C;
+			if (ahead > 1 && wld.handle && wld.is_lookup_possible(next_board, next_color)) {
+				int egdb_value, hval;
+				EGDB_BITBOARD kingsrow_pos;
+
+				gui_2_kingsrow_pos(kingsrow_pos, *next_board);
+				egdb_value = (*wld.handle->lookup)(wld.handle, &kingsrow_pos, gui_2_kingsrow_color(next_color), depth <= 4);
+
+				if (egdb_value == EGDB_DRAW)
+					value = 0;
+#if 1
+				if (egdb_value == EGDB_WIN) {
+					hval = egdb_eval(next_board, next_color, egdb_value);
+					if (next_color == WHITE) {
+						if (hval >= beta)
+							value = beta;
+					}
+					else {
+						if (hval <= alpha)
+							value = alpha;
+					}
+				}
+#endif
+			}
 
 			int nextDepth = depth - 1;
 			DoExtensions(nextDepth, fracDepth, ahead, g_Movelist[ahead].Moves[nM].SrcDst);
@@ -369,7 +371,7 @@ short ABSearch(int color, int ahead, int depth, int fracDepth, short alpha, shor
 			bestmove = nM;
 			beta = value;
 			if (alpha >= beta)
-				return beta;
+				return alpha;
 		}
 	}			// end for
 
