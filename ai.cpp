@@ -241,6 +241,16 @@ short ABSearch(int color, int ahead, int depth, int fracDepth, short alpha, shor
 			value = -9999;
 			nextbest = NONE;
 
+			int nextDepth = depth - 1;
+			DoExtensions(nextDepth, fracDepth, ahead, g_Movelist[ahead].Moves[nM].SrcDst);
+
+			// First look up the this Position in the Transposition Table
+			if (nextDepth > 1 && hashing == 1) {
+				indexTT = ((unsigned long)g_Boardlist[ahead].HashKey) % TTable_entries;
+				checksumTT = (unsigned long)(g_Boardlist[ahead].HashKey >> 32);
+				TTable[indexTT].Read(checksumTT, alpha, beta, nextbest, value, nextDepth, ahead);
+			}
+
 			/* Try probing the WLD db, see if we can get a cutoff. */
 			int next_color = g_Boardlist[ahead].SideToMove;
 			SCheckerBoard *next_board = &g_Boardlist[ahead].C;
@@ -258,24 +268,14 @@ short ABSearch(int color, int ahead, int depth, int fracDepth, short alpha, shor
 					hval = egdb_eval(next_board, next_color, egdb_value);
 					if (next_color == WHITE) {
 						if (hval >= beta)
-							value = beta;
+							value = hval;
 					}
 					else {
 						if (hval <= alpha)
-							value = alpha;
+							value = hval;
 					}
 				}
 #endif
-			}
-
-			int nextDepth = depth - 1;
-			DoExtensions(nextDepth, fracDepth, ahead, g_Movelist[ahead].Moves[nM].SrcDst);
-
-			// First look up the this Position in the Transposition Table
-			if (nextDepth > 1 && hashing == 1) {
-				indexTT = ((unsigned long)g_Boardlist[ahead].HashKey) % TTable_entries;
-				checksumTT = (unsigned long)(g_Boardlist[ahead].HashKey >> 32);
-				TTable[indexTT].Read(checksumTT, alpha, beta, nextbest, value, nextDepth, ahead);
 			}
 
 			// Then try Forward Pruning
@@ -393,14 +393,16 @@ int ComputerMove(char cColor, CBoard &InBoard)
 	extern COpeningBook* pBook;
 
 	// return if game is over
-	if (InBoard.C.BP == 0 || InBoard.C.WP == 0)
-		return 0;
+	if (InBoard.C.BP == 0)
+		return(cColor == BLACK ? -2000 : 2000);
+	if (InBoard.C.WP == 0)
+		return(cColor == BLACK ? 2000 : -2000);
 	if (cColor == BLACK)
 		g_Movelist[1].FindMovesBlack(InBoard.C);
 	if (cColor == WHITE)
 		g_Movelist[1].FindMovesWhite(InBoard.C);
 	if (g_Movelist[1].numMoves == 0)
-		return 0;				// game over
+		return(cColor == BLACK ? -2000 : 2000);
 	srand((unsigned int)time(0));
 	bestmove = rand() % g_Movelist[1].numMoves + 1;
 	starttime = clock();

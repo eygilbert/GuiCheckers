@@ -1868,6 +1868,7 @@ int WINAPI getmove
 
 	AddRepBoard(TEntry::HashBoard(g_CBoard), g_numMoves);
 
+	/* NOTE: g_CBoard.SideToMove is now the opposite of what is was before ComputerMove() !!! */
 	int retVal = CB_UNKNOWN;
 	if ((Eval > 320 && g_CBoard.SideToMove == BLACK) || (Eval < -320 && g_CBoard.SideToMove == WHITE))
 		retVal = CB_WIN;
@@ -1875,9 +1876,11 @@ int WINAPI getmove
 		retVal = CB_LOSS;
 	if ((g_numMoves > 90 && abs(Eval) < 11) || (g_numMoves > 150 && abs(Eval) < 50))
 		nDraw++;
+	else if (wld.handle && (g_CBoard.nBlack + g_CBoard.nWhite <= wld.dbpieces) && abs(Eval) <= 1)
+		nDraw++;
 	else
 		nDraw = 0;
-	if (nDraw >= 8)
+	if (nDraw >= 7)
 		retVal = CB_DRAW;
 	if (g_CBoard.InDatabase(g_dbInfo) && abs(Eval) < 2)
 		retVal = CB_DRAW;
